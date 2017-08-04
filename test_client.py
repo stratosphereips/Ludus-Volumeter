@@ -30,17 +30,25 @@ import socket
 import os
 import time
 
-
 if __name__ == '__main__':
-	import socket               # Import socket module
+	"""
+		Simple testing client
+		COMMANDS:
+			'GET_DATA'				- get json
+			'RESET'					- reset counters
+			'GET_DATA_AND_RESET'	- return data and reset the counters afterwards
+	"""
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-c', '--command', help='Command to be send to the volumeter', action='store', required=True, type=str)
+	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
+	args = parser.parse_args()
+
 
 	s = socket.socket()         # Create a socket object
 	host = 'localhost' # Get local machine name
 	port = 53333           # Reserve a port for your service.
 
-	s.connect((host, port))
-	s.sendall("GET_DATA")
+	s.connect((host, args.port))
+	s.sendall(args.command)
 	print s.recv(1024)
-	s.close  
-	print "Done"
-	#s.disconnect()
+	s.close()

@@ -183,7 +183,7 @@ class Counter(multiprocessing.Process):
             return json.dumps(self.ports,cls=MyEncoder)
         elif msg.lower() == 'get_data_and_reset':
             #get data first
-            response = "DATA'N'DELETE"
+            response = json.dumps(self.ports,cls=MyEncoder)
             #reset counters
             self.reset_counters()
             return response
@@ -222,9 +222,14 @@ class Counter(multiprocessing.Process):
             self.socket.close()
 
 if __name__ == '__main__':
-    #TODO: get this info automaticaly
-    ROUTER_PUBLIC_IP = '147.32.83.179'
-    PORT = 53333
+    #get parameters
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
+    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
+    args = parser.parse_args()
+    
+    ROUTER_PUBLIC_IP = args.address
+    PORT = args.port
 
     #create queue for comunication between processes
     queue = Queue()
