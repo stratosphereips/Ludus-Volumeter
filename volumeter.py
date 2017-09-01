@@ -180,7 +180,8 @@ class Counter(multiprocessing.Process):
     def process_msg(self, msg):
         """Processes the message recieved from the control program and if it contains known commnad, generates the respons"""
         if msg.lower() == 'get_data':
-            return json.dumps(self.ports,cls=MyEncoder)
+            data = json.dumps(self.ports)
+            return data
         elif msg.lower() == 'get_data_and_reset':
             #get data first
             response = json.dumps(self.ports,cls=MyEncoder)
