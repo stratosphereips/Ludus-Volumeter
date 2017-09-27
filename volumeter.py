@@ -31,19 +31,21 @@ import os
 import multiprocessing
 from multiprocessing import Queue
 
+def default(o):
+    return o._asdict()
+
 class MyEncoder(json.JSONEncoder):
     """Simple JSON encoder for storing Port objects"""
     def default(self, obj):
         if not isinstance(obj, Port):
             return super(MyEncoder, self).default(obj)
-
         return obj.__dict__
 
 class Port(object):
     """Container for volumes counting. For unfinished conections, buffers (1 pkts/event) are used as an estimation. THIS ESTIMATE IS ONLY USED IF ASKED FOR THE VOLUME BEFORE THE CONNNECTION ENDS. Upon
     recieving [DESTORY] event for the connection, value in buffer is reseted (we don't need it anymore because we ahave the real value)"""
     def __init__(self,port_number):
-        self.id = port_number
+    	self.id = port_number
         self.tcp_pkts = 0
         self.tcp_bytes = 0
         self.udp_pkts = 0
@@ -72,6 +74,11 @@ class Port(object):
         else:
             print "ERROR! Unsupported protocol."
 
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
+
     def increase_buffer(self, protocol,timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
         if protocol.lower() == "tcp":
@@ -81,7 +88,7 @@ class Port(object):
             self.udp_buffer +=1
             print "[{}] Active connection in port {}(TCP) - buffer incremented".format(timestamp, self.id)
         else:
-            print "ERROR! Unsupported protocol."        
+            print "ERROR! Unsupported protocol."    
 
 class Counter(multiprocessing.Process):
     """Counts pkts/bytes in each port"""
@@ -180,11 +187,11 @@ class Counter(multiprocessing.Process):
     def process_msg(self, msg):
         """Processes the message recieved from the control program and if it contains known commnad, generates the respons"""
         if msg.lower() == 'get_data':
-            data = json.dumps(self.ports)
+            data = json.dumps(self.ports.values(), default=lambda x: x.__dict__)
             return data
         elif msg.lower() == 'get_data_and_reset':
             #get data first
-            response = json.dumps(self.ports,cls=MyEncoder)
+            response = json.dumps(self.ports.values(), default=lambda x: x.__dict__)
             #reset counters
             self.reset_counters()
             return response
@@ -216,6 +223,7 @@ class Counter(multiprocessing.Process):
                     line = self.queue.get()
                     if len(line) > 0:
                         self.process_event(line)
+                        print "*{}\t{}".format(datetime.datetime.now(), line)
         except KeyboardInterrupt:
             sock.close()
             sys.exit()

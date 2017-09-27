@@ -43,9 +43,8 @@ class Volumeter_client(object):
 		self.socket.sendall('GET_DATA')
 		data = self.socket.recv(1024)
 		#print len(data)
-		print data
 		self.socket.close()
-		return data
+		return json.loads(data)
 
 	def reset_counter(self):
 		self.socket = socket.socket()
@@ -59,9 +58,10 @@ class Volumeter_client(object):
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
 		self.socket.sendall("GET_DATA_AND_RESET")
-		ret = self.socket.recv(1024)
+		data = self.socket.recv(1024)
+		#print len(data)
 		self.socket.close()
-		return ret
+		return json.loads(data)
 
 		
 if __name__ == '__main__':
@@ -78,5 +78,5 @@ if __name__ == '__main__':
 
 	s.connect((host, args.port))
 	s.sendall(args.command)
-	print s.recv(1024)
+	print json.loads(s.recv(1024))
 	s.close()
