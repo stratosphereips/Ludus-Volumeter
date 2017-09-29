@@ -45,7 +45,7 @@ class Port(object):
     """Container for volumes counting. For unfinished conections, buffers (1 pkts/event) are used as an estimation. THIS ESTIMATE IS ONLY USED IF ASKED FOR THE VOLUME BEFORE THE CONNNECTION ENDS. Upon
     recieving [DESTORY] event for the connection, value in buffer is reseted (we don't need it anymore because we ahave the real value)"""
     def __init__(self,port_number):
-    	self.id = port_number
+        self.id = port_number
         self.tcp_pkts = 0
         self.tcp_bytes = 0
         self.udp_pkts = 0
@@ -234,7 +234,7 @@ if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
-    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
+    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53336)
     args = parser.parse_args()
     
     ROUTER_PUBLIC_IP = args.address
@@ -251,7 +251,8 @@ if __name__ == '__main__':
 
     #***MAIN LOOP***
     try:
-        while True:
+        #while True:
+        """
             #read conntrack output
             line = process.stdout.readline()
             if not line:
@@ -260,6 +261,10 @@ if __name__ == '__main__':
             else:
                 #put everinthing in the queue
                 queue.put(line)
+        """
+        for line in process.stdout.readline().split('\n'):
+            print line
+            #queue.put(line)
     #  
     except KeyboardInterrupt:
         print "\nInterrupting..."
