@@ -31,12 +31,14 @@ import os
 import multiprocessing
 from multiprocessing import Queue
 
+def default(o):
+    return o._asdict()
+
 class MyEncoder(json.JSONEncoder):
     """Simple JSON encoder for storing Port objects"""
     def default(self, obj):
         if not isinstance(obj, Port):
             return super(MyEncoder, self).default(obj)
-
         return obj.__dict__
 
 class Port(object):
@@ -72,6 +74,11 @@ class Port(object):
         else:
             print "ERROR! Unsupported protocol."
 
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
+
     def increase_buffer(self, protocol,timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
         if protocol.lower() == "tcp":
@@ -81,7 +88,7 @@ class Port(object):
             self.udp_buffer +=1
             print "[{}] Active connection in port {}(TCP) - buffer incremented".format(timestamp, self.id)
         else:
-            print "ERROR! Unsupported protocol."        
+            print "ERROR! Unsupported protocol."    
 
 class Counter(multiprocessing.Process):
     """Counts pkts/bytes in each port"""
@@ -180,10 +187,11 @@ class Counter(multiprocessing.Process):
     def process_msg(self, msg):
         """Processes the message recieved from the control program and if it contains known commnad, generates the respons"""
         if msg.lower() == 'get_data':
-            return json.dumps(self.ports,cls=MyEncoder)
+            data = json.dumps(self.ports.values(), default=lambda x: x.__dict__)
+            return data
         elif msg.lower() == 'get_data_and_reset':
             #get data first
-            response = json.dumps(self.ports,cls=MyEncoder)
+            response = json.dumps(self.ports.values(), default=lambda x: x.__dict__)
             #reset counters
             self.reset_counters()
             return response
@@ -215,6 +223,7 @@ class Counter(multiprocessing.Process):
                     line = self.queue.get()
                     if len(line) > 0:
                         self.process_event(line)
+                        print "*{}\t{}".format(datetime.datetime.now(), line)
         except KeyboardInterrupt:
             sock.close()
             sys.exit()
@@ -225,7 +234,7 @@ if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
-    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
+    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53336)
     args = parser.parse_args()
     
     ROUTER_PUBLIC_IP = args.address
@@ -242,7 +251,8 @@ if __name__ == '__main__':
 
     #***MAIN LOOP***
     try:
-        while True:
+        #while True:
+        """
             #read conntrack output
             line = process.stdout.readline()
             if not line:
@@ -251,6 +261,10 @@ if __name__ == '__main__':
             else:
                 #put everinthing in the queue
                 queue.put(line)
+        """
+        for line in process.stdout.readline().split('\n'):
+            print line
+            #queue.put(line)
     #  
     except KeyboardInterrupt:
         print "\nInterrupting..."
