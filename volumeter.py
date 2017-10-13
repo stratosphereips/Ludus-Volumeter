@@ -222,7 +222,6 @@ if __name__ == '__main__':
         for line in process.stdout.readline().split('\n'):
             print line
             queue.put(line)
-
     except KeyboardInterrupt:
         print "\nInterrupting..."
         counter.join()

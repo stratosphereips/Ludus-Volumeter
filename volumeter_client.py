@@ -20,35 +20,63 @@
 
 # Description
 # A program that analyzes output of conntrack and counts pkts and bytes transfered in each port in each protocol
-import subprocess
-import re
-import datetime
-import json
-import argparse
-import sys
-import socket
-import os
-import time
 
-if __name__ == '__main__':
-	"""
-		Simple testing client
+import argparse
+import socket
+import json
+
+class Volumeter_client(object):
+	"""	Simple client for controling Volumeter
 		COMMANDS:
 			'GET_DATA'				- get json
 			'RESET'					- reset counters
 			'GET_DATA_AND_RESET'	- return data and reset the counters afterwards
 	"""
+	def __init__(self, host='localhost', port=53333):
+		#create socket
+		self.host = host
+		self.port =port
+
+	def get_data(self):
+		self.socket = socket.socket()
+		self.socket.connect((self.host,self.port))
+		self.socket.sendall('GET_DATA')
+		data = self.socket.recv(1024)
+		#print len(data)
+		self.socket.close()
+		return json.loads(data)
+
+	def reset_counter(self):
+		self.socket = socket.socket()
+		self.socket.connect((self.host,self.port))
+		self.socket.sendall("RESET")
+		ret = self.socket.recv(1024)
+		self.socket.close()
+		return ret
+
+	def get_data_and_reset(self):
+		self.socket = socket.socket()
+		self.socket.connect((self.host,self.port))
+		self.socket.sendall("GET_DATA_AND_RESET")
+		data = self.socket.recv(1024)
+		#print len(data)
+		self.socket.close()
+		return json.loads(data)
+
+		
+if __name__ == '__main__':
+	
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-c', '--command', help='Command to be send to the volumeter', action='store', required=True, type=str)
 	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
 	args = parser.parse_args()
 
 
-	s = socket.socket()         # Create a socket object
-	host = 'localhost' # Get local machine name
-	port = 53333           # Reserve a port for your service.
+	s = socket.socket()	# Create a socket object
+	host = 'localhost'	# Get local machine name
+	port = 53333		# Reserve a port for your service.
 
 	s.connect((host, args.port))
 	s.sendall(args.command)
-	print s.recv(1024)
+	print json.loads(s.recv(1024))
 	s.close()
