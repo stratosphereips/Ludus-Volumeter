@@ -59,15 +59,16 @@ class Port(object):
         self.tcp_buffer = 0
 
 
-    def toJSON(self):
-        return json.dumps(self, default=lambda o: o.__dict__, 
-            sort_keys=True, indent=4)
+    def values_for_json(self):
+        return (self.bytes, self.packets + self.buffer)
 
     def increase_buffer(self, timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
         print "[{}] Active connection in port {} - buffer incremented".format(timestamp, self.id)
         self.buffer +=1
 
+    def __str__(self):
+        return "<ID: {}, bytes: {}, packets: {}, buffer: {}>".format(self.id, self.bytes, self.packets, self.buffer)
 class Counter(multiprocessing.Process):
     """Counts pkts/bytes in each port"""
     def __init__(self, queue, router_ip, port):
@@ -99,7 +100,6 @@ class Counter(multiprocessing.Process):
 
         #is it a protocol with ports?
         if protocol == "udp" or protocol == "tcp":
-           
             #has the connection finished yet?
             if event.lower() == 'destroy':
                 src_ip = parts[3].strip("src=")
@@ -114,32 +114,48 @@ class Counter(multiprocessing.Process):
                     pkts = int(parts[7].strip("packtets=")) +  int(parts[13].strip("packtets="))
                     data_bytes = int(parts[8].strip("bytes=")) + int(parts[14].strip("bytes="))
                 #store the vlaues in the dict
-                if dst_ip == ROUTER_PUBLIC_IP:
-                    try:
-                        self.udp[dport].add_values(protocol, pkts, data_bytes,timestamp)
-                    except KeyError:
-                        #first time we see it
-                        self.udp[dport] = Port(dport)
-                        self.udp[dport].add_values(protocol, pkts, data_bytes,timestamp)
+                if dst_ip == self.router_ip:
+                    if protocol == "tcp":
+                        try:
+                            self.tcp[dport].add_values(pkts, data_bytes,timestamp)
+                        except KeyError:
+                            #first time we see it
+                            self.tcp[dport] = Port(dport)
+                            self.tcp[dport].add_values(pkts, data_bytes,timestamp)
+                    else:
+                        try:
+                            self.udp[dport].add_values(pkts, data_bytes,timestamp)
+                        except KeyError:
+                            #first time we see it
+                            self.udp[dport] = Port(dport)
+                            self.udp[dport].add_values(pkts, data_bytes,timestamp)
             else: #Active connection - at least estimate the number of pkts
                 if protocol == 'tcp':
                     dst_ip = parts[6].strip("dst=")
                     dport = parts[8].strip("dport=")
+                    #store values
+                    if dst_ip == self.router_ip:
+                        try:
+                            self.tcp[dport].increase_buffer(timestamp)
+                        except KeyError:
+                            #first time we see it
+                            self.tcp[dport] = Port(dport)
+                            self.tcp[dport].increase_buffer(timestamp)
                 else:
                     dst_ip = parts[5].strip("dst=")
                     dport = parts[8].strip("dport=")
-                #store values
-                if dst_ip == ROUTER_PUBLIC_IP:
-                    try:
-                        self.tcp[dport].increase_buffer(protocol,timestamp)
-                    except KeyError:
-                        #first time we see it
-                        self.tcp[dport] = Port(dport)
-                        self.tcp[dport].increase_buffer(protocol,timestamp)
+                    #store values
+                    if dst_ip == self.router_ip:
+                        try:
+                            self.udp[dport].increase_buffer(timestamp)
+                        except KeyError:
+                            #first time we see it
+                            self.udp[dport] = Port(dport)
+                            self.udp[dport].increase_buffer(timestamp)
         #ICMP
         elif protocol == "icmp":
             dst_ip = parts[4].strip("dst=")
-            if dst_ip == ROUTER_PUBLIC_IP:
+            if dst_ip == self.router_ip:           
                 if event.lower() == 'destroy':
                     self.icmp.add_values(int(parts[8].strip("packtets=")) +  int(parts[15].strip("packtets=")), int(parts[8].strip("packtets=")) +  int(parts[15].strip("packtets=")),timestamp)
                 else:
@@ -147,7 +163,18 @@ class Counter(multiprocessing.Process):
         else:
             #we are not interested in anyhting else for now, just continue
             pass
-
+    def create_JSON(self):
+        d = {}
+        d['icmp'] = self.icmp.values_for_json()
+        tmp = {}
+        for port in self.tcp.keys():
+            tmp[port] = self.tcp[port].values_for_json()
+        d['tcp'] = tmp
+        tmp = {}
+        for port in self.udp.keys():
+            tmp[port] = self.udp[port].values_for_json()
+        d['udp'] = tmp
+        return d
 
     def process_msg(self, msg):
         """Processes the message recieved from the control program and if it contains known commnad, generates the respons"""
@@ -157,7 +184,7 @@ class Counter(multiprocessing.Process):
             return data
         elif msg.lower() == 'get_data_and_reset':
             #get data first
-            response = json.dumps(self.ports.values(), default=lambda x: x.__dict__)
+            response = json.dumps(self.create_JSON())
             #reset counters
             self.reseted_counters()
             return response
@@ -191,7 +218,9 @@ class Counter(multiprocessing.Process):
                     line = self.queue.get()
                     if len(line) > 0:
                         self.process_event(line)
-                        print "*{}\t{}".format(datetime.datetime.now(), line)
+                        #print "*{}\t{}".format(datetime.datetime.now(), line)
+                        #print self.tcp
+                        #print self.udp
         except KeyboardInterrupt:
             self.socket.close()
             sys.exit()
@@ -202,27 +231,26 @@ if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
-    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53336)
+    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53339)
     args = parser.parse_args()
     
-    ROUTER_PUBLIC_IP = args.address
-    PORT = args.port
 
     #create queue for comunication between processes
     queue = Queue()
     #create new process
-    counter = Counter(queue, ROUTER_PUBLIC_IP, PORT)
+    counter = Counter(queue, args.address, args.port)
     #start it
     counter.start()
     #yet another process
     process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     #***MAIN LOOP***
-    try:
-        for line in process.stdout.readline().split('\n'):
-            print line
-            queue.put(line)
-    except KeyboardInterrupt:
-        print "\nInterrupting..."
-        counter.join()
-        print "Done"
+    while True:
+        try:
+            for line in process.stdout.readline().split('\n'):
+                queue.put(line)
+        except KeyboardInterrupt:
+            print "\nInterrupting..."
+            counter.join()
+            print "Done"
+            exit()
