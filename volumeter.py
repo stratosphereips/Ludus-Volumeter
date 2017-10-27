@@ -60,7 +60,7 @@ class Port(object):
 
 
     def values_for_json(self):
-        return (self.bytes, self.packets + self.buffer)
+        return {'bytes': self.bytes, 'packets':(self.packets + self.buffer)}
 
     def increase_buffer(self, timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
@@ -175,6 +175,10 @@ class Counter(multiprocessing.Process):
             tmp[port] = self.udp[port].values_for_json()
         d['udp'] = tmp
         return d
+    def reset_counters(self):
+        self.udp = {}
+        self.tcp = {}
+        self.icmp = Port('icmp')
 
     def process_msg(self, msg):
         """Processes the message recieved from the control program and if it contains known commnad, generates the respons"""
@@ -186,7 +190,7 @@ class Counter(multiprocessing.Process):
             #get data first
             response = json.dumps(self.create_JSON())
             #reset counters
-            self.reseted_counters()
+            self.reset_counters()
             return response
         elif msg.lower() == 'reset':
             #reset counters
