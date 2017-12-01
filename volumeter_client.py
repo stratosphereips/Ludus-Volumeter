@@ -32,17 +32,17 @@ class Volumeter_client(object):
 			'RESET'					- reset counters
 			'GET_DATA_AND_RESET'	- return data and reset the counters afterwards
 	"""
-	def __init__(self, host='localhost', port=53333):
+	def __init__(self, port, host='localhost'):
 		#create socket
 		self.host = host
-		self.port =port
+		self.port = port
 
 	def get_data(self):
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
 		self.socket.sendall('GET_DATA')
 		data = self.socket.recv(1024)
-		#print len(data)
+		print data
 		self.socket.close()
 		return json.loads(data)
 
@@ -70,13 +70,13 @@ if __name__ == '__main__':
 	parser.add_argument('-c', '--command', help='Command to be send to the volumeter', action='store', required=True, type=str)
 	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
 	args = parser.parse_args()
-
+	
 
 	s = socket.socket()	# Create a socket object
 	host = 'localhost'	# Get local machine name
-	port = 53333		# Reserve a port for your service.
+	port = 53340		# Reserve a port for your service.
 
 	s.connect((host, args.port))
 	s.sendall(args.command)
-	print json.loads(s.recv(1024))
+	print s.recv(1024)
 	s.close()

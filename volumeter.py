@@ -79,6 +79,7 @@ class Counter(multiprocessing.Process):
         self.udp = {}
 
         self.router_ip = router_ip
+        self.keep_running = True
         self.socket =socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setblocking(0)
         self.socket.bind(('localhost', port))
@@ -199,12 +200,15 @@ class Counter(multiprocessing.Process):
             self.tcp = {}
             #confirm
             return "reset_done"
+        elif msg.lower() == "terminate":
+            self.keep_running  =False
+            return "terminating"
         else: #we dont recognize the command
             return "unknown_command"
 
     def run(self):
         try:
-            while True:
+            while self.keep_running:
                 #do we have a connection?
                 try:
                     c, addr = self.socket.accept()
@@ -214,6 +218,10 @@ class Counter(multiprocessing.Process):
                         print "MSG: '{}'".format(msg)
                         c.send(response)
                         c.close()
+                        if(response.lower() == "terminating"):
+                            print "Breaking the main loop"
+                            self.socket.close()
+                            break
                 except socket.error:
                     #no, just wait
                     pass
@@ -225,6 +233,7 @@ class Counter(multiprocessing.Process):
                         #print "*{}\t{}".format(datetime.datetime.now(), line)
                         #print self.tcp
                         #print self.udp
+            self.socket.close()
         except KeyboardInterrupt:
             self.socket.close()
             sys.exit()
@@ -235,7 +244,7 @@ if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
-    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53339)
+    parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
     
 
@@ -244,9 +253,14 @@ if __name__ == '__main__':
     #create new process
     counter = Counter(queue, args.address, args.port)
     #start it
+    print("Staring counter:{}", datetime.datetime.now())
     counter.start()
+
     #yet another process
     process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    #counter.join()
+    #print("Joined counter:{}", datetime.datetime.now())
 
     #***MAIN LOOP***
     while True:
@@ -255,6 +269,8 @@ if __name__ == '__main__':
                 queue.put(line)
         except KeyboardInterrupt:
             print "\nInterrupting..."
+            counter.terminate()
+            process.terminate()
             counter.join()
             print "Done"
-            exit()
+            exit
