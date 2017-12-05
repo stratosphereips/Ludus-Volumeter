@@ -1,8 +1,8 @@
 # Ludus-Volumeter
 Tool which measures the packets and bytes transfered in ports over time and loggs the information. Part of the LUDUS project.
 
-##Usage
-Volumeter is required for running ludus.py. 
+## Usage
+**NOTE Volumeter is required for running ludus.py.** 
 ```bash
 python volumeter.py
 ``` 
