@@ -71,7 +71,7 @@ class Port(object):
         return "<ID: {}, bytes: {}, packets: {}, buffer: {}>".format(self.id, self.bytes, self.packets, self.buffer)
 class Counter(multiprocessing.Process):
     """Counts pkts/bytes in each port"""
-    def __init__(self, queue, router_ip, port):
+    def __init__(self, queue, router_ip, port,end_flag):
         multiprocessing.Process.__init__(self)
         self.queue = queue
         self.tcp = {}
@@ -79,7 +79,7 @@ class Counter(multiprocessing.Process):
         self.udp = {}
 
         self.router_ip = router_ip
-        self.keep_running = True
+        self.end_flag = end_flag
         self.socket =socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setblocking(0)
         self.socket.bind(('localhost', port))
@@ -201,14 +201,13 @@ class Counter(multiprocessing.Process):
             #confirm
             return "reset_done"
         elif msg.lower() == "terminate":
-            self.keep_running  =False
             return "terminating"
         else: #we dont recognize the command
             return "unknown_command"
 
     def run(self):
         try:
-            while self.keep_running:
+            while not self.is_set():
                 #do we have a connection?
                 try:
                     c, addr = self.socket.accept()
@@ -219,9 +218,7 @@ class Counter(multiprocessing.Process):
                         c.send(response)
                         c.close()
                         if(response.lower() == "terminating"):
-                            print "Breaking the main loop"
-                            self.socket.close()
-                            break
+                            self.end_flag.set()
                 except socket.error:
                     #no, just wait
                     pass
@@ -230,9 +227,6 @@ class Counter(multiprocessing.Process):
                     line = self.queue.get()
                     if len(line) > 0:
                         self.process_event(line)
-                        #print "*{}\t{}".format(datetime.datetime.now(), line)
-                        #print self.tcp
-                        #print self.udp
             self.socket.close()
         except KeyboardInterrupt:
             self.socket.close()
@@ -247,7 +241,8 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
     
-
+    #create flag to exit gracefully
+    exit_flag = multiprocessing.Event()
     #create queue for comunication between processes
     queue = Queue()
     #create new process
@@ -259,18 +254,14 @@ if __name__ == '__main__':
     #yet another process
     process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    #counter.join()
-    #print("Joined counter:{}", datetime.datetime.now())
-
     #***MAIN LOOP***
-    while True:
+    while not exit_flag.is_set():
         try:
             for line in process.stdout.readline().split('\n'):
                 queue.put(line)
         except KeyboardInterrupt:
             print "\nInterrupting..."
-            counter.terminate()
+            exit_flag.set()
             process.terminate()
             counter.join()
             print "Done"
-            exit

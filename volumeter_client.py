@@ -70,7 +70,7 @@ class Volumeter_client(object):
 		"""Sends signal to the Volumeter to terminate"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
-		self.socket.sendall("GET_DATA_AND_TERMINATE")
+		self.socket.sendall("TERMINATE")
 		data = self.socket.recv(1024)
 		#print len(data)
 		self.socket.close()
@@ -80,14 +80,13 @@ if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-c', '--command', help='Command to be send to the volumeter', action='store', required=True, type=str)
-	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
+	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53336)
 	args = parser.parse_args()
 	
 
 	s = socket.socket()	# Create a socket object
 	host = 'localhost'	# Get local machine name
-	port = 53340		# Reserve a port for your service.
-
+	
 	s.connect((host, args.port))
 	s.sendall(args.command)
 	print s.recv(1024)
