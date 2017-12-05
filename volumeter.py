@@ -207,7 +207,7 @@ class Counter(multiprocessing.Process):
 
     def run(self):
         try:
-            while not self.is_set():
+            while not self.end_flag.is_set():
                 #do we have a connection?
                 try:
                     c, addr = self.socket.accept()
@@ -246,7 +246,7 @@ if __name__ == '__main__':
     #create queue for comunication between processes
     queue = Queue()
     #create new process
-    counter = Counter(queue, args.address, args.port)
+    counter = Counter(queue, args.address, args.port,exit_flag)
     #start it
     print("Staring counter:{}", datetime.datetime.now())
     counter.start()
