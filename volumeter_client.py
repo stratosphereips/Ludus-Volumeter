@@ -74,7 +74,7 @@ class Volumeter_client(object):
 		data = self.socket.recv(1024)
 		#print len(data)
 		self.socket.close()
-		return json.loads(data)
+		return data
 		
 if __name__ == '__main__':
 	
