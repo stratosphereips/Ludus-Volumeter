@@ -38,6 +38,7 @@ class Volumeter_client(object):
 		self.port = port
 
 	def get_data(self):
+		"""Sends signal to get data"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
 		self.socket.sendall('GET_DATA')
@@ -47,6 +48,7 @@ class Volumeter_client(object):
 		return json.loads(data)
 
 	def reset_counter(self):
+		"""Send signal to reset the counters"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
 		self.socket.sendall("RESET")
@@ -55,6 +57,7 @@ class Volumeter_client(object):
 		return ret
 
 	def get_data_and_reset(self):
+		"""Sends signal to get data and reset counters afterwards"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
 		self.socket.sendall("GET_DATA_AND_RESET")
@@ -62,7 +65,16 @@ class Volumeter_client(object):
 		#print len(data)
 		self.socket.close()
 		return json.loads(data)
-
+	
+	def terminate(self):
+		"""Sends signal to the Volumeter to terminate"""
+		self.socket = socket.socket()
+		self.socket.connect((self.host,self.port))
+		self.socket.sendall("GET_DATA_AND_TERMINATE")
+		data = self.socket.recv(1024)
+		#print len(data)
+		self.socket.close()
+		return json.loads(data)
 		
 if __name__ == '__main__':
 	
