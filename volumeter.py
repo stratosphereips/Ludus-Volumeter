@@ -16,7 +16,7 @@
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 # Author:
-# Ondrej Lukas      ondrej.lukas95@gmail.com    
+# Ondrej Lukas, ondrej.lukas95@gmail.com    
 
 # Description
 # A program that analyzes output of conntrack and counts pkts and bytes transfered in each port in each protocol
@@ -40,6 +40,7 @@ class MyEncoder(json.JSONEncoder):
         if not isinstance(obj, Port):
             return super(MyEncoder, self).default(obj)
         return obj.__dict__
+
 class Port(object):
     """Container for volumes counting. For unfinished conections, buffers (1 pkts/event) are used as an estimation. THIS ESTIMATE IS ONLY USED IF ASKED FOR THE VOLUME BEFORE THE CONNNECTION ENDS. Upon
     recieving [DESTORY] event for the connection, value in buffer is reseted (we don't need it anymore because we ahave the real value)"""
@@ -69,6 +70,7 @@ class Port(object):
 
     def __str__(self):
         return "<ID: {}, bytes: {}, packets: {}, buffer: {}>".format(self.id, self.bytes, self.packets, self.buffer)
+
 class Counter(multiprocessing.Process):
     """Counts pkts/bytes in each port"""
     def __init__(self, queue, router_ip, port,end_flag):
@@ -234,34 +236,43 @@ class Counter(multiprocessing.Process):
         finally:
             self.socket.close()
 
+class Volumeter(object):
+
+
+    def __init__(self,address, port):
+        self.address = address
+        self.port = port
+   
+    def main(self):
+        #create flag to exit gracefully
+        exit_flag = multiprocessing.Event()
+        #create queue for comunication between processes
+        queue = Queue()
+        #create new process
+        counter = Counter(queue, self.address, self.port,exit_flag)
+        #start it
+        print("Staring counter:{}", datetime.datetime.now())
+        counter.start()
+
+        #yet another process
+        process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        #***MAIN LOOP***
+        while not exit_flag.is_set():
+            try:
+                for line in process.stdout.readline().split('\n'):
+                    queue.put(line)
+            except KeyboardInterrupt:
+                print "\nInterrupting volumeter"
+                exit_flag.set()
+                process.terminate()
+                counter.join()
+        print("Leaving Volumeter")
+
 if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
     parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
-    
-    #create flag to exit gracefully
-    exit_flag = multiprocessing.Event()
-    #create queue for comunication between processes
-    queue = Queue()
-    #create new process
-    counter = Counter(queue, args.address, args.port,exit_flag)
-    #start it
-    print("Staring counter:{}", datetime.datetime.now())
-    counter.start()
-
-    #yet another process
-    process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    #***MAIN LOOP***
-    while not exit_flag.is_set():
-        try:
-            for line in process.stdout.readline().split('\n'):
-                queue.put(line)
-        except KeyboardInterrupt:
-            print "\nInterrupting..."
-            exit_flag.set()
-            process.terminate()
-            counter.join()
-            print "Done"
+    main(args.address,args.port)
